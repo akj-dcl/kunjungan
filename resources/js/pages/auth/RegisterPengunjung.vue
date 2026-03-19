@@ -19,8 +19,8 @@ const form = useForm({
 // Fungsi helper untuk validasi file di sisi frontend
 const validateFile = (file: File, fieldName: 'foto_diri' | 'foto_ktp') => {
     // Cek Ukuran (1MB = 1048576 bytes)
-    if (file.size > 1048576) {
-        form.errors[fieldName] = `Ukuran file maksimal adalah 1 MB.`;
+    if (file.size > 5048576) {
+        form.errors[fieldName] = `Ukuran file maksimal adalah 5 MB.`;
         return false;
     }
     // Cek Tipe File

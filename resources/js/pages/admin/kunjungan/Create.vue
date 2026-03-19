@@ -126,8 +126,12 @@ const submit = () => {
                             <input v-model="form.tanggal_kunjungan" type="date" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500" required>
                         </div>
                         <div class="space-y-2">
-                            <label class="text-sm font-medium text-red-600">Waktu Kunjungan *</label>
-                            <input v-model="form.waktu_kunjungan" type="time" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500" required>
+                            <label class="text-sm font-medium text-red-600">Pilih Sesi Kunjungan *</label>
+                            <select v-model="form.waktu_kunjungan" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500" required>
+                                <option value="" disabled>-- Pilih Sesi --</option>
+                                <option value="Sesi 1 (09.00 - 11.00)">Sesi 1 Pagi (09.00 - 11.00 WITA)</option>
+                                <option value="Sesi 2 (13.00 - 15.00)">Sesi 2 Siang (13.00 - 15.00 WITA)</option>
+                            </select>
                         </div>
                     </div>
 

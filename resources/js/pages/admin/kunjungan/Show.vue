@@ -56,7 +56,7 @@ onMounted(() => {
                     <div class="w-full space-y-4 text-sm text-gray-800">
                         <div class="grid grid-cols-3 gap-2 border-b border-gray-100 pb-2">
                             <span class="text-gray-500 font-medium">Waktu Kunjungan</span>
-                            <span class="col-span-2 font-bold text-lg text-blue-700">: {{ kunjungan.tanggal_kunjungan }} ({{ kunjungan.waktu_kunjungan }})</span>
+                            <span class="col-span-2 font-bold text-lg text-blue-700">: {{ kunjungan.tanggal_kunjungan }} <br> <span class="text-sm text-gray-600 ml-2">🕒 {{ kunjungan.waktu_kunjungan }}</span></span>
                         </div>
                         <div class="grid grid-cols-3 gap-2">
                             <span class="text-gray-500 font-medium">Nama Pengunjung</span>

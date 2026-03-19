@@ -33,12 +33,12 @@ class RegisterPengunjungController extends Controller
             'no_ktp' => 'required|string|unique:pengunjungs',
             'no_hp' => 'required|string',
             'alamat' => 'required|string',
-            'foto_diri' => 'required|file|mimes:jpeg,png,jpg,pdf|max:1024',
-            'foto_ktp' => 'required|file|mimes:jpeg,png,jpg,pdf|max:1024',
+            'foto_diri' => 'required|file|mimes:jpeg,png,jpg,pdf|max:5024',
+            'foto_ktp' => 'required|file|mimes:jpeg,png,jpg,pdf|max:5024',
         ], [
-            'foto_diri.max' => 'Ukuran foto diri maksimal adalah 1 MB.',
+            'foto_diri.max' => 'Ukuran foto diri maksimal adalah 5 MB.',
             'foto_diri.mimes' => 'Format foto diri harus berupa JPEG, PNG, JPG, atau PDF.',
-            'foto_ktp.max' => 'Ukuran foto KTP maksimal adalah 1 MB.',
+            'foto_ktp.max' => 'Ukuran foto KTP maksimal adalah 5 MB.',
             'foto_ktp.mimes' => 'Format foto KTP harus berupa JPEG, PNG, JPG, atau PDF.',
         ]);
 

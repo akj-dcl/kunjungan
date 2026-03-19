@@ -6,28 +6,35 @@ use App\Models\Kunjungan;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
-use Carbon\Carbon;
 
 class KunjunganExport implements FromCollection, WithHeadings, WithMapping
 {
-    protected $filter;
+    protected $startDate, $endDate, $uptId, $sesi;
 
-    public function __construct($filter)
+    // Tangkap semua parameter filter dari Controller
+    public function __construct($startDate, $endDate, $uptId, $sesi = null)
     {
-        $this->filter = $filter;
+        $this->startDate = $startDate;
+        $this->endDate = $endDate;
+        $this->uptId = $uptId;
+        $this->sesi = $sesi;
     }
 
     public function collection()
     {
-        $query = Kunjungan::with(['pengunjung.user', 'wbp.sel.blok', 'upt'])->where('status', 'Selesai');
+        $query = Kunjungan::with(['pengunjung.user', 'wbp.sel.blok', 'upt'])
+            ->where('status', 'Selesai')
+            ->whereBetween('tanggal_kunjungan', [$this->startDate, $this->endDate]);
 
-        $now = Carbon::now();
-        if ($this->filter === 'hari') {
-            $query->whereDate('tanggal_kunjungan', $now->toDateString());
-        } elseif ($this->filter === 'minggu') {
-            $query->whereBetween('tanggal_kunjungan', [$now->startOfWeek()->toDateString(), $now->endOfWeek()->toDateString()]);
-        } elseif ($this->filter === 'bulan') {
-            $query->whereMonth('tanggal_kunjungan', $now->month)->whereYear('tanggal_kunjungan', $now->year);
+        // Filter UPT jika ada
+        if ($this->uptId) {
+            $query->where('upt_id', $this->uptId);
+        }
+
+        // Filter Sesi jika dipilih (Sesi 1 atau Sesi 2)
+        if ($this->sesi) {
+            // Pakai 'like' agar cocok dengan string "Sesi 1 (09.00 - 11.00)" di DB
+            $query->where('waktu_kunjungan', 'like', $this->sesi . '%');
         }
 
         return $query->get();
@@ -36,7 +43,7 @@ class KunjunganExport implements FromCollection, WithHeadings, WithMapping
     public function headings(): array
     {
         return [
-            'Tanggal', 'Waktu', 'UPT Lapas', 'Nama Pengunjung', 'NIK Pengunjung', 
+            'Tanggal', 'Sesi / Waktu', 'UPT Lapas', 'Nama Pengunjung', 'NIK Pengunjung', 
             'Nama WBP', 'Blok / Sel', 'Laki-laki', 'Perempuan', 'Anak', 'Total Pengikut', 'Status'
         ];
     }

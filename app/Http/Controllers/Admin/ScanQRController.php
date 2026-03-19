@@ -12,13 +12,11 @@ use Carbon\Carbon;
 
 class ScanQRController extends Controller
 {
-    // 1. Menampilkan Halaman Scanner
     public function index()
     {
         return Inertia::render('admin/scanqr/Index');
     }
 
-    // 2. Memproses Hasil Scan QR
     public function process(Request $request)
     {
         $request->validate(['qr_code' => 'required|string']);
@@ -32,7 +30,7 @@ class ScanQRController extends Controller
         }
 
         // ==========================================
-        // ISOLASI DATA LOKASI LAPAS
+        // 1. ISOLASI DATA LOKASI LAPAS
         // ==========================================
         $user = auth()->user();
         if ($user->upt_id && $kunjungan->upt_id !== $user->upt_id) {
@@ -43,12 +41,11 @@ class ScanQRController extends Controller
         }
         
         // ==========================================
-        // VALIDASI STATUS & TANGGAL (Kadaluarsa & Terlalu Cepat)
+        // 2. VALIDASI HARI (KADALUARSA / KECEPETAN)
         // ==========================================
         $hariIni = Carbon::now()->startOfDay();
         $tanggalKunjungan = Carbon::parse($kunjungan->tanggal_kunjungan)->startOfDay();
 
-        // 1. Cek apakah tanggalnya sudah lewat (Kadaluarsa)
         if ($tanggalKunjungan->lessThan($hariIni)) {
             if ($kunjungan->status !== 'Kadaluarsa') {
                 $kunjungan->update(['status' => 'Kadaluarsa']);
@@ -59,15 +56,48 @@ class ScanQRController extends Controller
             ], 400); 
         }
 
-        // 2. Cek apakah datangnya kecepetan (Nyolong Start)
         if ($tanggalKunjungan->greaterThan($hariIni)) {
             return response()->json([
                 'success' => false, 
-                'message' => 'Belum waktunya berkunjung! Jadwal kunjungan ini untuk besok lusa: ' . $tanggalKunjungan->format('d M Y') . '. Silakan datang pada tanggal tersebut.'
+                'message' => 'Belum waktunya berkunjung! Jadwal kunjungan ini untuk besok lusa: ' . $tanggalKunjungan->format('d M Y') . '.'
             ], 400); 
         }
 
-        // 3. Cek status lainnya
+        // ==========================================
+        // 3. VALIDASI JAM SESI (HARI H)
+        // ==========================================
+        // String dari DB, misal: "Sesi 1 (09.00 - 11.00)"
+        $waktuSesi = $kunjungan->waktu_kunjungan; 
+        
+        // Jam server saat ini (contoh: 10:45)
+        $waktuSekarang = Carbon::now()->format('H:i'); 
+        
+        // Ekstrak rentang jam dari string. Pakai Regex buat ambil angka "09.00 - 11.00"
+        if (preg_match('/\((\d{2}\.\d{2})\s*-\s*(\d{2}\.\d{2})\)/', $waktuSesi, $matches)) {
+            // Ubah format titik jadi titik dua biar bisa dibandingin (09.00 -> 09:00)
+            $jamBuka = str_replace('.', ':', $matches[1]);
+            $jamTutup = str_replace('.', ':', $matches[2]);
+
+            // Cek apakah pengunjung datang SEBELUM jam buka
+            if ($waktuSekarang < $jamBuka) {
+                return response()->json([
+                    'success' => false, 
+                    'message' => "SESI BELUM DIMULAI! Anda terdaftar untuk $waktuSesi. Silakan tunggu di ruang tunggu hingga jam $jamBuka."
+                ], 400); 
+            }
+
+            // Cek apakah pengunjung datang SETELAH jam tutup
+            if ($waktuSekarang > $jamTutup) {
+                return response()->json([
+                    'success' => false, 
+                    'message' => "SESI SUDAH BERAKHIR! Anda terdaftar untuk $waktuSesi. Waktu Anda sudah lewat."
+                ], 400); 
+            }
+        }
+
+        // ==========================================
+        // 4. CEK STATUS LAINNYA
+        // ==========================================
         if ($kunjungan->status === 'Selesai') {
             return response()->json([
                 'success' => false, 
@@ -87,12 +117,11 @@ class ScanQRController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'QR Code berhasil dikonfirmasi!',
+            'message' => 'Kunjungan Dikonfirmasi! Silakan masuk.',
             'data' => $kunjungan
         ]);
     }
 
-    // 3. Export Excel (Harian, Mingguan, Bulanan)
     public function export($filter)
     {
         if (!in_array($filter, ['hari', 'minggu', 'bulan', 'semua'])) {

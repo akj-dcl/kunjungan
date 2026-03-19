@@ -16,42 +16,35 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
         $user = auth()->user();
-        
-        // Cek apakah user adalah Kanwil / Super Admin (Atau punya upt_id kosong)
         $isKanwil = $user->hasRole(['Super Admin', 'Admin Kanwil', 'Supervisor Kanwil']) || empty($user->upt_id);
-        
-        // Ambil data UPT hanya jika dia Kanwil untuk dropdown
         $upts = $isKanwil ? Upt::select('id', 'name')->where('is_active', true)->get() : [];
 
         // Parameter Filter
         $startDate = $request->start_date ?? now()->startOfMonth()->format('Y-m-d');
         $endDate = $request->end_date ?? now()->endOfMonth()->format('Y-m-d');
         $uptId = $request->upt_id;
+        $sesi = $request->sesi; // Tangkap filter sesi
 
-        // Query Dasar (Hanya yang statusnya Selesai yang dihitung sbg kunjungan nyata)
         $query = Kunjungan::where('status', 'Selesai')
             ->whereBetween('tanggal_kunjungan', [$startDate, $endDate]);
 
-        // ==========================================
-        // JURUS ISOLASI DATA DASHBOARD
-        // ==========================================
+        // Isolasi UPT
         if ($isKanwil) {
-            // Jika Kanwil dan dia memilih filter UPT tertentu di dropdown
-            if ($uptId) {
-                $query->where('upt_id', $uptId);
-            }
+            if ($uptId) $query->where('upt_id', $uptId);
         } else {
-            // Jika Admin/Operator Lapas, PAKSA query hanya menghitung data Lapasnya sendiri
             $query->where('upt_id', $user->upt_id);
         }
 
-        // PERHITUNGAN DATABASE (Sangat Ringan!)
+        // TAMBAHAN: Filter berdasarkan Sesi
+        if ($sesi) {
+            $query->where('waktu_kunjungan', 'like', $sesi . '%');
+        }
+
         $ringkasan = (clone $query)
             ->selectRaw('SUM(1 + total_pengikut) as total_orang_membesuk')
             ->selectRaw('COUNT(DISTINCT wbp_id) as total_wbp_dibesuk')
             ->first();
 
-        // GRAFIK DATA (Dikelompokkan per tanggal)
         $grafikData = (clone $query)
             ->select(
                 'tanggal_kunjungan as tanggal',
@@ -69,6 +62,7 @@ class DashboardController extends Controller
                 'start_date' => $startDate,
                 'end_date' => $endDate,
                 'upt_id' => $uptId,
+                'sesi' => $sesi, // Lempar ke Vue
             ],
             'ringkasan' => [
                 'total_orang' => $ringkasan->total_orang_membesuk ?? 0,
@@ -84,15 +78,15 @@ class DashboardController extends Controller
         $isKanwil = $user->hasRole(['Super Admin', 'Admin Kanwil', 'Supervisor Kanwil']) || empty($user->upt_id);
         
         $uptId = $request->upt_id;
+        $sesi = $request->sesi; // Tangkap filter sesi
 
-        // Amankan fitur Export Excel! 
-        // Jika bukan Kanwil, paksa ID UPT menggunakan UPT milik petugas tersebut.
         if (!$isKanwil) {
             $uptId = $user->upt_id; 
         }
 
         $namaFile = 'Laporan_Kunjungan_' . date('Ymd_His') . '.xlsx';
         
-        return Excel::download(new KunjunganExport($request->start_date, $request->end_date, $uptId), $namaFile);
+        // Lempar parameter $sesi ke Export class
+        return Excel::download(new KunjunganExport($request->start_date, $request->end_date, $uptId, $sesi), $namaFile);
     }
 }

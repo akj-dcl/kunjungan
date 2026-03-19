@@ -47,8 +47,8 @@ class PengunjungController extends Controller
             'no_ktp' => 'required|string|unique:pengunjungs',
             'no_hp' => 'required|string',
             'alamat' => 'required|string',
-            'foto_diri' => 'required|image|max:2048',
-            'foto_ktp' => 'required|image|max:2048',
+            'foto_diri' => 'required|image|max:5042',
+            'foto_ktp' => 'required|image|max:5042',
         ]);
 
         $user = User::create([
@@ -94,8 +94,8 @@ class PengunjungController extends Controller
             'no_ktp' => 'required|string|unique:pengunjungs,no_ktp,' . $pengunjung->id,
             'no_hp' => 'required|string',
             'alamat' => 'required|string',
-            'foto_diri' => 'nullable|image|max:2048',
-            'foto_ktp' => 'nullable|image|max:2048',
+            'foto_diri' => 'nullable|image|max:5042',
+            'foto_ktp' => 'nullable|image|max:5042',
         ]);
 
         // Update User

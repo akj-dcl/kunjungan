@@ -13,7 +13,8 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
 const props = defineProps<{
     isKanwil: boolean;
     upts: { id: number, name: string }[];
-    filters: { start_date: string, end_date: string, upt_id: string | null };
+    // Tambahkan sesi di filters
+    filters: { start_date: string, end_date: string, upt_id: string | null, sesi: string | null };
     ringkasan: { total_orang: number, total_wbp: number };
     grafik: { tanggal: string, total_orang: number, total_wbp: number }[];
 }>();
@@ -22,7 +23,8 @@ const props = defineProps<{
 const filterForm = ref({
     start_date: props.filters.start_date,
     end_date: props.filters.end_date,
-    upt_id: props.filters.upt_id || ''
+    upt_id: props.filters.upt_id || '',
+    sesi: props.filters.sesi || '' // Tambahkan ini
 });
 
 // Watcher untuk Filter (Otomatis reload data tanpa refresh halaman)
@@ -92,7 +94,15 @@ const chartOptions = {
                     <label class="text-sm font-medium">Sampai Tanggal</label>
                     <input v-model="filterForm.end_date" type="date" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary" />
                 </div>
-                
+
+                <div class="space-y-1 min-w-[150px]">
+                    <label class="text-sm font-medium">Pilih Sesi</label>
+                    <select v-model="filterForm.sesi" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary">
+                        <option value="">Semua Sesi</option>
+                        <option value="Sesi 1">Sesi 1 Pagi</option>
+                        <option value="Sesi 2">Sesi 2 Siang</option>
+                    </select>
+                </div>
                 <div v-if="isKanwil" class="space-y-1 flex-1 min-w-[200px]">
                     <label class="text-sm font-medium">Pilih UPT (Kanwil Akses)</label>
                     <select v-model="filterForm.upt_id" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary">

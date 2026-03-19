@@ -85,7 +85,7 @@ function destroyKunjungan(id: number) {
               <tr v-for="k in kunjungans.data" :key="k.id" class="border-b border-border transition-colors hover:bg-muted/50">
                 <td class="p-4">
                   <div class="font-medium text-primary">{{ k.tanggal_kunjungan }}</div>
-                  <div class="text-xs text-muted-foreground">Jam: {{ k.waktu_kunjungan }}</div>
+                  <div class="text-xs text-muted-foreground font-semibold mt-1">{{ k.waktu_kunjungan }}</div>
                 </td>
                 <td class="p-4">
                   <div class="font-medium">{{ k.pengunjung?.user?.name ?? 'Tidak diketahui' }}</div>
