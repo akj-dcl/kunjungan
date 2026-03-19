@@ -124,6 +124,7 @@ const submit = () => {
                         <div class="space-y-2">
                             <label class="text-sm font-medium text-red-600">Tanggal Kunjungan *</label>
                             <input v-model="form.tanggal_kunjungan" type="date" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500" required>
+                            <div v-if="form.errors.tanggal_kunjungan" class="text-xs font-medium text-red-500 mt-1">{{ form.errors.tanggal_kunjungan }}</div>
                         </div>
                         <div class="space-y-2">
                             <label class="text-sm font-medium text-red-600">Pilih Sesi Kunjungan *</label>

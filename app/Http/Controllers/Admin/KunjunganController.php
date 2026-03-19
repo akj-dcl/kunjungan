@@ -11,7 +11,7 @@ use Illuminate\Support\Str;
 use chillerlan\QRCode\QRCode;
 use chillerlan\QRCode\QROptions;
 use Carbon\Carbon;
-// use chillerlan\QRCode\Output\QROutputInterface;
+use Illuminate\Validation\ValidationException;
 
 class KunjunganController extends Controller
 {
@@ -27,18 +27,11 @@ class KunjunganController extends Controller
 
         $query = Kunjungan::with(['upt', 'wbp', 'pengunjung.user']);
 
-        // CEK ROLE DI BACKEND SAJA (Lebih Akurat)
         $isPengunjung = $user->hasRole('Pengunjung');
 
-        // Jika login sebagai pengunjung, hanya tampilkan kunjungan miliknya
         if ($isPengunjung && $user->pengunjung) {
             $query->where('pengunjung_id', $user->pengunjung->id);
         } else {
-            // ==============================================================
-            // JURUS ISOLASI DATA (KHUSUS PETUGAS/ADMIN LAPAS)
-            // ==============================================================
-            // Jika user punya upt_id (berarti dia petugas cabang, bukan Kanwil), 
-            // maka hanya tampilkan Kunjungan yang terjadi di UPT tersebut.
             $query->when($user->upt_id, function ($q) use ($user) {
                 $q->where('upt_id', $user->upt_id);
             });
@@ -56,7 +49,6 @@ class KunjunganController extends Controller
     {
         $user = auth()->user();
         
-        // JIKA USER PUNYA UPT_ID, AMBIL 1 UPT SAJA. JIKA KANWIL, AMBIL SEMUA.
         $upts = $user->upt_id 
             ? Upt::where('id', $user->upt_id)->get() 
             : Upt::where('is_active', true)->get();
@@ -73,11 +65,25 @@ class KunjunganController extends Controller
             'waktu_kunjungan' => 'required',
         ]);
 
+        // ==============================================================
+        // CEK KUOTA HARIAN (LIMIT 200 PER UPT PER HARI)
+        // ==============================================================
+        $kuotaMaksimal = 200;
+        $jumlahAntrean = Kunjungan::where('upt_id', $request->upt_id)
+            ->where('tanggal_kunjungan', $request->tanggal_kunjungan)
+            ->whereNotIn('status', ['Batal', 'Kadaluarsa']) // Abaikan yang batal/kadaluarsa
+            ->count();
+
+        if ($jumlahAntrean >= $kuotaMaksimal) {
+            throw ValidationException::withMessages([
+                'tanggal_kunjungan' => "Mohon maaf, kuota kunjungan untuk tanggal tersebut sudah penuh (Maks: $kuotaMaksimal antrean). Silakan pilih tanggal lain."
+            ]);
+        }
+        // ==============================================================
+
         $user = auth()->user();
-        // Ambil ID pengunjung. Jika Super Admin yang sedang testing, kita pasang null atau ID 1 sementara
         $pengunjungId = $user->pengunjung ? $user->pengunjung->id : 1; 
 
-        // 1. Simpan Data Kunjungan & Generate UUID untuk QR Code
         $kunjungan = Kunjungan::create([
             'pengunjung_id' => $pengunjungId,
             'upt_id' => $request->upt_id,
@@ -92,7 +98,6 @@ class KunjunganController extends Controller
             'status' => 'Menunggu Kedatangan Kunjungan'
         ]);
 
-        // 2. Simpan Data Barang Bawaan (Titipan)
         if ($request->has('barang_bawaan') && is_array($request->barang_bawaan)) {
             foreach ($request->barang_bawaan as $barang) {
                 if (!empty($barang['jenis_barang'])) {
@@ -105,7 +110,6 @@ class KunjunganController extends Controller
             }
         }
 
-        // Redirect ke halaman detail (menampilkan QR Code)
         return redirect()->route('kunjungans.show', $kunjungan->id)
                          ->with('success', 'Data kunjungan berhasil dibuat!');
     }
@@ -114,10 +118,9 @@ class KunjunganController extends Controller
     {
         $kunjungan->load(['upt', 'wbp.sel.blok', 'barangBawaans', 'pengunjung.user']);
         
-        // Gunakan string langsung 'svg' (ini cara paling aman dan kompatibel dengan semua versi)
         $options = new QROptions([
             'version'      => 5,
-            'outputType'   => 'svg', // UBAH BAGIAN INI
+            'outputType'   => 'svg',
             'imageBase64'  => true,
         ]);
         
@@ -133,19 +136,16 @@ class KunjunganController extends Controller
     {
         $user = auth()->user();
         
-        // Cegah pengunjung mengakses halaman edit
         if ($user->hasRole('Pengunjung')) {
             abort(403, 'Anda tidak memiliki akses untuk mengedit data kunjungan.');
         }
 
-        // Keamanan Ekstra: Cegah petugas mengedit data Kunjungan milik Lapas lain
         if ($user->upt_id && $kunjungan->upt_id !== $user->upt_id) {
             abort(403, 'Akses Ditolak! Anda tidak dapat mengedit data kunjungan dari Lapas lain.');
         }
 
         $kunjungan->load(['wbp.sel.blok', 'wbp.jenisKejahatan', 'barangBawaans']);
         
-        // Logic dropdown sama seperti di Create()
         $upts = $user->upt_id 
             ? Upt::where('id', $user->upt_id)->get() 
             : Upt::where('is_active', true)->get();
@@ -170,7 +170,25 @@ class KunjunganController extends Controller
             'waktu_kunjungan' => 'required',
         ]);
 
-        // 1. Update Data Kunjungan Utama
+        // ==============================================================
+        // CEK KUOTA HARIAN (Khusus jika mengganti Tanggal atau UPT)
+        // ==============================================================
+        if ($kunjungan->tanggal_kunjungan !== $request->tanggal_kunjungan || $kunjungan->upt_id !== $request->upt_id) {
+            $kuotaMaksimal = 200;
+            $jumlahAntrean = Kunjungan::where('upt_id', $request->upt_id)
+                ->where('tanggal_kunjungan', $request->tanggal_kunjungan)
+                ->where('id', '!=', $kunjungan->id) // Jangan hitung diri sendiri
+                ->whereNotIn('status', ['Batal', 'Kadaluarsa'])
+                ->count();
+
+            if ($jumlahAntrean >= $kuotaMaksimal) {
+                throw ValidationException::withMessages([
+                    'tanggal_kunjungan' => "Mohon maaf, kuota kunjungan untuk tanggal tersebut sudah penuh (Maks: $kuotaMaksimal antrean). Silakan pilih tanggal lain."
+                ]);
+            }
+        }
+        // ==============================================================
+
         $kunjungan->update([
             'upt_id' => $request->upt_id,
             'wbp_id' => $request->wbp_id,
@@ -180,10 +198,9 @@ class KunjunganController extends Controller
             'pengikut_perempuan' => $request->pengikut_perempuan,
             'pengikut_anak' => $request->pengikut_anak,
             'total_pengikut' => $request->total_pengikut,
-            'status' => $request->status, // Memungkinkan admin merubah status manual
+            'status' => $request->status,
         ]);
 
-        // 2. Hapus semua barang bawaan lama, lalu insert yang baru (Cara paling aman)
         $kunjungan->barangBawaans()->delete();
 
         if ($request->has('barang_bawaan') && is_array($request->barang_bawaan)) {
@@ -203,14 +220,11 @@ class KunjunganController extends Controller
 
     public function destroy(Kunjungan $kunjungan)
     {
-        // Pastikan hanya Super Admin atau pengunjung yang bersangkutan yang bisa menghapus
         $user = auth()->user();
         if ($user->hasRole('Pengunjung') && $kunjungan->pengunjung_id !== $user->pengunjung->id) {
             abort(403, 'Anda tidak memiliki akses untuk menghapus data ini.');
         }
 
-        // Karena di tabel barang_bawaan kita pakai cascadeOnDelete,
-        // kita cukup hapus data kunjungannya saja, barang otomatis terhapus
         $kunjungan->delete();
 
         return redirect()->route('kunjungans.index')->with('success', 'Data kunjungan berhasil dihapus.');
