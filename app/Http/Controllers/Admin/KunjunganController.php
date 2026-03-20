@@ -12,6 +12,7 @@ use chillerlan\QRCode\QRCode;
 use chillerlan\QRCode\QROptions;
 use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class KunjunganController extends Controller
 {
@@ -37,12 +38,109 @@ class KunjunganController extends Controller
             });
         }
 
-        $kunjungans = $query->latest()->paginate(10);
+        // =========================================================
+        // LOGIKA FILTERING (Pencarian, Tanggal, Sesi)
+        // =========================================================
+        $query->when($request->search, function ($q, $search) {
+            $q->where(function($query) use ($search) {
+                $query->whereHas('pengunjung.user', function ($q2) use ($search) {
+                    $q2->where('name', 'like', "%{$search}%");
+                })->orWhereHas('wbp', function ($q3) use ($search) {
+                    $q3->where('nama', 'like', "%{$search}%");
+                });
+            });
+        });
+
+        $query->when($request->tanggal, function ($q, $tanggal) {
+            $q->whereDate('tanggal_kunjungan', $tanggal);
+        });
+
+        $query->when($request->waktu, function ($q, $waktu) {
+            // Menggunakan LIKE agar kalau ada embel-embel jam tetap terbaca
+            $q->where('waktu_kunjungan', 'LIKE', "%{$waktu}%"); 
+        });
+        // =========================================================
+
+        // Tambahkan withQueryString() agar filter tidak hilang saat ganti halaman pagination
+        $kunjungans = $query->latest()->paginate(10)->withQueryString();
 
         return Inertia::render('admin/kunjungan/Index', [
             'kunjungans' => $kunjungans,
-            'isPengunjung' => $isPengunjung, 
+            'isPengunjung' => $isPengunjung,
+            'filters' => $request->only(['search', 'tanggal', 'waktu']) // Kirim filter ke frontend
         ]);
+    }
+
+    // =========================================================
+    // METHOD EXPORT EXCEL (CSV Native)
+    // =========================================================
+    public function export(Request $request)
+    {
+        $user = auth()->user();
+        $query = Kunjungan::with(['upt', 'wbp', 'pengunjung.user']);
+
+        if ($user->hasRole('Pengunjung') && $user->pengunjung) {
+            $query->where('pengunjung_id', $user->pengunjung->id);
+        } else {
+            $query->when($user->upt_id, function ($q) use ($user) {
+                $q->where('upt_id', $user->upt_id);
+            });
+        }
+
+        // Terapkan filter yang sama untuk data yang diexport
+        $query->when($request->search, function ($q, $search) {
+            $q->where(function($query) use ($search) {
+                $query->whereHas('pengunjung.user', function ($q2) use ($search) {
+                    $q2->where('name', 'like', "%{$search}%");
+                })->orWhereHas('wbp', function ($q3) use ($search) {
+                    $q3->where('nama', 'like', "%{$search}%");
+                });
+            });
+        });
+        $query->when($request->tanggal, function ($q, $tanggal) {
+            $q->whereDate('tanggal_kunjungan', $tanggal);
+        });
+        $query->when($request->waktu, function ($q, $waktu) {
+            $q->where('waktu_kunjungan', $waktu);
+        });
+
+        $kunjungans = $query->latest()->get();
+
+        $fileName = 'Data_Kunjungan_' . date('Y-m-d_H-i-s') . '.csv';
+
+        $headers = [
+            "Content-type"        => "text/csv",
+            "Content-Disposition" => "attachment; filename=$fileName",
+            "Pragma"              => "no-cache",
+            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+            "Expires"             => "0"
+        ];
+
+        $columns = ['Tanggal', 'Sesi', 'Nama Pengunjung', 'Nama WBP', 'UPT', 'Status'];
+
+        $callback = function() use($kunjungans, $columns) {
+            $file = fopen('php://output', 'w');
+            
+            // Tambahkan BOM agar Excel membaca karakter UTF-8 dengan benar
+            fputs($file, $bom = (chr(0xEF) . chr(0xBB) . chr(0xBF)));
+            
+            // Gunakan separator titik koma (;) yang lebih ramah untuk Microsoft Excel Indonesia
+            fputcsv($file, $columns, ';'); 
+
+            foreach ($kunjungans as $k) {
+                fputcsv($file, [
+                    $k->tanggal_kunjungan,
+                    $k->waktu_kunjungan,
+                    $k->pengunjung?->user?->name ?? 'Tidak diketahui',
+                    $k->wbp?->nama ?? '-',
+                    $k->upt?->name ?? '-',
+                    $k->status
+                ], ';');
+            }
+            fclose($file);
+        };
+
+        return new StreamedResponse($callback, 200, $headers);
     }
 
     public function create()

@@ -48,6 +48,8 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->group(function () {
     Route::resource('wbps', WbpController::class);
     Route::resource('data-akun', DataAkunController::class)->names('data-akun');
     Route::resource('pengunjungs', PengunjungController::class);
+    Route::resource('pengunjungs', PengunjungController::class);
+    Route::get('kunjungans/export', [KunjunganController::class, 'export'])->name('kunjungans.export');
     Route::resource('kunjungans', KunjunganController::class);
     Route::get('/datamaster/DataAkun', function () {
         return Inertia::render('admin/datamaster/DataAkun');

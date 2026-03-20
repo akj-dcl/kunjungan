@@ -35,28 +35,73 @@ const validateFile = (file: File, fieldName: 'foto_diri' | 'foto_ktp') => {
     return true;
 };
 
-const handleFotoDiri = (e: Event) => {
+// ==========================================
+// 2. FUNGSI KOMPRESI GAMBAR DI FRONTEND (ANTI LEMOT)
+// ==========================================
+const compressImage = (file: File, maxWidth = 800): Promise<File> => {
+    return new Promise((resolve) => {
+        // Kalau file PDF, jangan dikompres
+        if (file.type === 'application/pdf') return resolve(file);
+
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target?.result as string;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                // Perkecil dimensi gambar
+                if (width > maxWidth) {
+                    height = Math.round((height * maxWidth) / width);
+                    width = maxWidth;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx?.drawImage(img, 0, 0, width, height);
+
+                // Ubah kembali jadi file dengan kualitas 75%
+                canvas.toBlob((blob) => {
+                    if (blob) {
+                        const compressedFile = new File([blob], file.name, {
+                            type: 'image/jpeg',
+                            lastModified: Date.now(),
+                        });
+                        resolve(compressedFile);
+                    } else {
+                        resolve(file); // Fallback
+                    }
+                }, 'image/jpeg', 0.75);
+            };
+        };
+    });
+};
+
+// Update handle foto untuk menjalankan kompresi dulu!
+const handleFotoDiri = async (e: Event) => {
     const target = e.target as HTMLInputElement;
     if (target.files && target.files.length > 0) {
-        const file = target.files[0];
+        let file = target.files[0];
         if (validateFile(file, 'foto_diri')) {
-            form.foto_diri = file;
+            form.foto_diri = await compressImage(file); // Proses kompresi berjalan di sini
         } else {
-            target.value = ''; // Reset input jika file tidak valid
-            form.foto_diri = null;
+            target.value = ''; form.foto_diri = null;
         }
     }
 };
 
-const handleFotoKtp = (e: Event) => {
+const handleFotoKtp = async (e: Event) => {
     const target = e.target as HTMLInputElement;
     if (target.files && target.files.length > 0) {
-        const file = target.files[0];
+        let file = target.files[0];
         if (validateFile(file, 'foto_ktp')) {
-            form.foto_ktp = file;
+            form.foto_ktp = await compressImage(file); // Proses kompresi berjalan di sini
         } else {
-            target.value = ''; // Reset input jika file tidak valid
-            form.foto_ktp = null;
+            target.value = ''; form.foto_ktp = null;
         }
     }
 };
@@ -165,13 +210,13 @@ const submit = () => {
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div class="space-y-1">
                                 <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Nomor KTP (NIK) *</label>
-                                <input v-model="form.no_ktp" type="text" class="w-full h-11 rounded-lg border-gray-300 bg-white px-3 text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-900 dark:border-gray-700 shadow-sm" required />
+                                <input v-model="form.no_ktp" type="text" maxlength="16" @input="form.no_ktp = form.no_ktp.replace(/\D/g, '')" placeholder="16 Digit NIK" class="w-full h-11 rounded-lg border-gray-300 bg-white px-3 text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-900 dark:border-gray-700 shadow-sm" required />
                                 <div v-if="form.errors.no_ktp" class="text-xs font-medium text-red-500 mt-1">{{ form.errors.no_ktp }}</div>
                             </div>
 
                             <div class="space-y-1">
                                 <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Nomor HP (WhatsApp) *</label>
-                                <input v-model="form.no_hp" type="text" class="w-full h-11 rounded-lg border-gray-300 bg-white px-3 text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-900 dark:border-gray-700 shadow-sm" required />
+                                <input v-model="form.no_hp" type="text" @input="form.no_hp = form.no_hp.replace(/\D/g, '')" placeholder="08123456789" class="w-full h-11 rounded-lg border-gray-300 bg-white px-3 text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-900 dark:border-gray-700 shadow-sm" required />
                                 <div v-if="form.errors.no_hp" class="text-xs font-medium text-red-500 mt-1">{{ form.errors.no_hp }}</div>
                             </div>
 

@@ -17,19 +17,130 @@ type Pengunjung = {
 const props = defineProps<{ pengunjung: Pengunjung }>()
 
 const form = useForm({
-  _method: 'PUT', // Inertia butuh ini untuk upload file via method PUT
+  _method: 'PUT',
   name: props.pengunjung.user?.name ?? '',
   username: props.pengunjung.user?.username ?? '',
   email: props.pengunjung.user?.email ?? '',
   password: '',
   jenis_kelamin: props.pengunjung.jenis_kelamin ?? 'Laki-laki',
   no_ktp: props.pengunjung.no_ktp ?? '',
-  no_hp: props.pengunjung.no_hp ?? '',
+  no_hp: props.pengunjung.no_hp ?? '', // Cukup begini saja
   alamat: props.pengunjung.alamat ?? '',
   foto_diri: null as File | null,
   foto_ktp: null as File | null,
 })
 
+// Fungsi helper untuk validasi file di sisi frontend
+const validateFile = (file: File, fieldName: 'foto_diri' | 'foto_ktp') => {
+    // Cek Ukuran (1MB = 1048576 bytes)
+    if (file.size > 5048576) {
+        form.errors[fieldName] = `Ukuran file maksimal adalah 5 MB.`;
+        return false;
+    }
+    // Cek Tipe File
+    const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+    if (!validTypes.includes(file.type)) {
+        form.errors[fieldName] = `Format file harus JPEG, PNG, atau PDF.`;
+        return false;
+    }
+    
+    // Jika lolos, bersihkan pesan error (kalau ada)
+    form.errors[fieldName] = '';
+    return true;
+};
+
+const handleNoHpInput = (e: Event) => {
+    let val = (e.target as HTMLInputElement).value;
+    
+    // Ambil hanya angka dari inputan
+    let digits = val.replace(/\D/g, '');
+
+    // Hilangkan 62 atau 0 di depan jika ada
+    if (digits.startsWith('62')) {
+        digits = digits.substring(2);
+    } else if (digits.startsWith('0')) {
+        digits = digits.substring(1);
+    }
+
+    // Gabungkan dengan +62 dan Spasi
+    form.no_hp = digits.length > 0 ? '+62 ' + digits : '+62 ';
+};
+
+// Set nilai default awal
+if (!form.no_hp || form.no_hp === '') {
+    form.no_hp = '+62 ';
+}
+
+// ==========================================
+// 2. FUNGSI KOMPRESI GAMBAR DI FRONTEND (ANTI LEMOT)
+// ==========================================
+const compressImage = (file: File, maxWidth = 800): Promise<File> => {
+    return new Promise((resolve) => {
+        // Kalau file PDF, jangan dikompres
+        if (file.type === 'application/pdf') return resolve(file);
+
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target?.result as string;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                // Perkecil dimensi gambar
+                if (width > maxWidth) {
+                    height = Math.round((height * maxWidth) / width);
+                    width = maxWidth;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx?.drawImage(img, 0, 0, width, height);
+
+                // Ubah kembali jadi file dengan kualitas 75%
+                canvas.toBlob((blob) => {
+                    if (blob) {
+                        const compressedFile = new File([blob], file.name, {
+                            type: 'image/jpeg',
+                            lastModified: Date.now(),
+                        });
+                        resolve(compressedFile);
+                    } else {
+                        resolve(file); // Fallback
+                    }
+                }, 'image/jpeg', 0.75);
+            };
+        };
+    });
+};
+
+// Update handle foto untuk menjalankan kompresi dulu!
+const handleFotoDiri = async (e: Event) => {
+    const target = e.target as HTMLInputElement;
+    if (target.files && target.files.length > 0) {
+        let file = target.files[0];
+        if (validateFile(file, 'foto_diri')) {
+            form.foto_diri = await compressImage(file); // Proses kompresi berjalan di sini
+        } else {
+            target.value = ''; form.foto_diri = null;
+        }
+    }
+};
+
+const handleFotoKtp = async (e: Event) => {
+    const target = e.target as HTMLInputElement;
+    if (target.files && target.files.length > 0) {
+        let file = target.files[0];
+        if (validateFile(file, 'foto_ktp')) {
+            form.foto_ktp = await compressImage(file); // Proses kompresi berjalan di sini
+        } else {
+            target.value = ''; form.foto_ktp = null;
+        }
+    }
+};
 function submit() {
   form.post(`/admin/pengunjungs/${props.pengunjung.id}`)
 }
@@ -87,13 +198,13 @@ function submit() {
 
             <div class="space-y-2">
               <label class="text-sm font-medium leading-none">Nomor KTP (NIK)</label>
-              <input v-model="form.no_ktp" type="text" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:opacity-50" />
+              <input v-model="form.no_ktp" type="text" maxlength="16" @input="form.no_ktp = form.no_ktp.replace(/\D/g, '')" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:opacity-50" />
               <div v-if="form.errors.no_ktp" class="text-sm font-medium text-destructive">{{ form.errors.no_ktp }}</div>
             </div>
 
             <div class="space-y-2">
               <label class="text-sm font-medium leading-none">Nomor HP</label>
-              <input v-model="form.no_hp" type="text" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:opacity-50" />
+              <input v-model="form.no_hp" type="text" @input="form.no_hp = form.no_hp.replace(/\D/g, '')" placeholder="08123456789" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:opacity-50" />
               <div v-if="form.errors.no_hp" class="text-sm font-medium text-destructive">{{ form.errors.no_hp }}</div>
             </div>
 
@@ -107,7 +218,7 @@ function submit() {
               <label class="text-sm font-medium leading-none">Foto Diri Baru (Opsional)</label>
               <div class="flex items-center gap-4">
                 <img v-if="pengunjung.foto_diri" :src="`/storage/${pengunjung.foto_diri}`" class="h-16 w-16 rounded object-cover border" />
-                <input type="file" @input="(e) => form.foto_diri = (e.target as HTMLInputElement).files?.[0] || null" accept="image/*" class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground file:border-0 file:bg-transparent file:text-sm file:font-medium" />
+                <input type="file" @change="handleFotoDiri" accept="image/*" class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground file:border-0 file:bg-transparent file:text-sm file:font-medium" />
               </div>
               <div v-if="form.errors.foto_diri" class="text-sm font-medium text-destructive">{{ form.errors.foto_diri }}</div>
             </div>
@@ -116,7 +227,7 @@ function submit() {
               <label class="text-sm font-medium leading-none">Foto KTP Baru (Opsional)</label>
               <div class="flex items-center gap-4">
                 <img v-if="pengunjung.foto_ktp" :src="`/storage/${pengunjung.foto_ktp}`" class="h-16 w-24 rounded object-cover border" />
-                <input type="file" @input="(e) => form.foto_ktp = (e.target as HTMLInputElement).files?.[0] || null" accept="image/*" class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground file:border-0 file:bg-transparent file:text-sm file:font-medium" />
+                <input type="file" @change="handleFotoKtp" accept="image/*" class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground file:border-0 file:bg-transparent file:text-sm file:font-medium" />
               </div>
               <div v-if="form.errors.foto_ktp" class="text-sm font-medium text-destructive">{{ form.errors.foto_ktp }}</div>
             </div>

@@ -27,15 +27,21 @@ class RegisterPengunjungController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:255|unique:users',
-            'email' => 'nullable|string|email|max:255',
+            // Email opsional, tapi kalau diisi harus unik
+            'email' => 'nullable|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
             'jenis_kelamin' => 'required|string',
-            'no_ktp' => 'required|string|unique:pengunjungs',
-            'no_hp' => 'required|string',
+            // NIK HARUS 16 DIGIT
+            'no_ktp' => 'required|string|size:16|unique:pengunjungs',
+            // NO HP wajib, akan dicek format +62 di frontend
+            'no_hp' => 'required|string|min:10',
             'alamat' => 'required|string',
             'foto_diri' => 'required|file|mimes:jpeg,png,jpg,pdf|max:5024',
             'foto_ktp' => 'required|file|mimes:jpeg,png,jpg,pdf|max:5024',
         ], [
+            'no_ktp.size' => 'Nomor KTP (NIK) harus berjumlah tepat 16 digit angka.',
+            'no_ktp.unique' => 'Nomor KTP (NIK) ini sudah terdaftar sebelumnya.',
+            'email.unique' => 'Email ini sudah digunakan oleh akun lain.',
             'foto_diri.max' => 'Ukuran foto diri maksimal adalah 5 MB.',
             'foto_diri.mimes' => 'Format foto diri harus berupa JPEG, PNG, JPG, atau PDF.',
             'foto_ktp.max' => 'Ukuran foto KTP maksimal adalah 5 MB.',

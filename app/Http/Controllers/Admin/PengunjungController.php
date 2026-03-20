@@ -41,14 +41,17 @@ class PengunjungController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:255|unique:users',
-            'email' => 'required|string|email|max:255',
+            'email' => 'nullable|string|email|max:255|unique:users', // Ubah jadi nullable & unique
             'password' => 'required|string|min:8',
             'jenis_kelamin' => 'required|string',
-            'no_ktp' => 'required|string|unique:pengunjungs',
-            'no_hp' => 'required|string',
+            'no_ktp' => 'required|string|size:16|unique:pengunjungs', // NIK 16 digit
+            'no_hp' => 'required|string|min:10',
             'alamat' => 'required|string',
             'foto_diri' => 'required|image|max:5042',
             'foto_ktp' => 'required|image|max:5042',
+        ], [
+            'no_ktp.size' => 'Nomor KTP (NIK) harus 16 digit.',
+            'email.unique' => 'Email sudah digunakan.',
         ]);
 
         $user = User::create([
@@ -89,13 +92,18 @@ class PengunjungController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:255|unique:users,username,' . $pengunjung->user_id,
-            'email' => 'required|string|email|max:255',
+            // Pengecualian unique email untuk user ini sendiri
+            'email' => 'nullable|string|email|max:255|unique:users,email,' . $pengunjung->user_id,
             'jenis_kelamin' => 'required|string',
-            'no_ktp' => 'required|string|unique:pengunjungs,no_ktp,' . $pengunjung->id,
-            'no_hp' => 'required|string',
+            // Pengecualian unique NIK untuk pengunjung ini sendiri
+            'no_ktp' => 'required|string|size:16|unique:pengunjungs,no_ktp,' . $pengunjung->id,
+            'no_hp' => 'required|string|min:10',
             'alamat' => 'required|string',
             'foto_diri' => 'nullable|image|max:5042',
             'foto_ktp' => 'nullable|image|max:5042',
+        ], [
+            'no_ktp.size' => 'Nomor KTP (NIK) harus 16 digit.',
+            'email.unique' => 'Email sudah digunakan.',
         ]);
 
         // Update User

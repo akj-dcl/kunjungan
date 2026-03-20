@@ -35,7 +35,13 @@ watch(
   debounce((newSearch: string) => {
     const params = new URLSearchParams();
     if (newSearch) params.append('search', newSearch);
-    window.location.href = window.location.pathname + '?' + params.toString();
+    
+    // Ganti window.location dengan router.get dari Inertia
+    router.get(window.location.pathname, Object.fromEntries(params), {
+      preserveState: true,
+      preserveScroll: true,
+      replace: true // Supaya riwayat back button tidak dipenuhi hasil pencarian tiap huruf
+    });
   }, 300)
 )
 
@@ -136,7 +142,7 @@ function destroyBlok(id: number) {
         <div class="flex gap-1">
           <template v-for="(link, key) in bloks.links" :key="key">
             <div v-if="link.url === null" class="px-3 py-1 text-sm text-muted-foreground border border-transparent" v-html="link.label" />
-            <Link v-else :href="link.url" class="px-3 py-1 text-sm rounded-md border transition-colors" :class="link.active ? 'bg-primary text-primary-foreground border-primary' : 'border-border bg-background hover:bg-accent hover:text-accent-foreground'" v-html="link.label" />
+            <Link v-else :href="link.url" preserve-state preserve-scroll class="px-3 py-1 text-sm rounded-md border transition-colors" :class="link.active ? 'bg-primary text-primary-foreground border-primary' : 'border-border bg-background hover:bg-accent hover:text-accent-foreground'" v-html="link.label" />
           </template>
         </div>
       </div>
