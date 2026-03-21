@@ -22,7 +22,7 @@ const passwordInput = useTemplateRef('passwordInput');
 </script>
 
 <template>
-    <div class="space-y-6">
+    <!-- <div class="space-y-6">
         <Heading
             variant="small"
             title="Delete account"
@@ -109,5 +109,5 @@ const passwordInput = useTemplateRef('passwordInput');
                 </DialogContent>
             </Dialog>
         </div>
-    </div>
+    </div> -->
 </template>
