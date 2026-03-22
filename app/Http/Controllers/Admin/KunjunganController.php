@@ -154,6 +154,65 @@ class KunjunganController extends Controller
         return Inertia::render('admin/kunjungan/Create', ['upts' => $upts]);
     }
 
+    // public function store(Request $request)
+    // {
+    //     $request->validate([
+    //         'upt_id' => 'required|exists:upts,id',
+    //         'wbp_id' => 'required|exists:wbps,id',
+    //         'tanggal_kunjungan' => 'required|date',
+    //         'waktu_kunjungan' => 'required',
+    //     ]);
+
+    //     // ==============================================================
+    //     // CEK KUOTA HARIAN (LIMIT 200 PER UPT PER HARI)
+    //     // ==============================================================
+    //     $kuotaMaksimal = 200;
+    //     $jumlahAntrean = Kunjungan::where('upt_id', $request->upt_id)
+    //         ->where('tanggal_kunjungan', $request->tanggal_kunjungan)
+    //         ->whereNotIn('status', ['Batal', 'Kadaluarsa']) // Abaikan yang batal/kadaluarsa
+    //         ->count();
+
+    //     if ($jumlahAntrean >= $kuotaMaksimal) {
+    //         throw ValidationException::withMessages([
+    //             'tanggal_kunjungan' => "Mohon maaf, kuota kunjungan untuk tanggal tersebut sudah penuh (Maks: $kuotaMaksimal antrean). Silakan pilih tanggal lain."
+    //         ]);
+    //     }
+    //     // ==============================================================
+
+    //     $user = auth()->user();
+    //     $pengunjungId = $user->pengunjung ? $user->pengunjung->id : 1; 
+
+    //     $kunjungan = Kunjungan::create([
+    //         'pengunjung_id' => $pengunjungId,
+    //         'upt_id' => $request->upt_id,
+    //         'wbp_id' => $request->wbp_id,
+    //         'tanggal_kunjungan' => $request->tanggal_kunjungan,
+    //         'waktu_kunjungan' => $request->waktu_kunjungan,
+    //         'pengikut_laki' => $request->pengikut_laki,
+    //         'pengikut_perempuan' => $request->pengikut_perempuan,
+    //         'pengikut_anak' => $request->pengikut_anak,
+    //         'total_pengikut' => $request->total_pengikut,
+    //         'qr_code_uuid' => Str::uuid()->toString(),
+    //         'status' => 'Menunggu Kedatangan Kunjungan'
+    //     ]);
+
+    //     if ($request->has('barang_bawaan') && is_array($request->barang_bawaan)) {
+    //         foreach ($request->barang_bawaan as $barang) {
+    //             if (!empty($barang['jenis_barang'])) {
+    //                 $kunjungan->barangBawaans()->create([
+    //                     'jenis_barang' => $barang['jenis_barang'],
+    //                     'jumlah' => $barang['jumlah'],
+    //                     'keterangan' => $barang['keterangan'] ?? '-',
+    //                 ]);
+    //             }
+    //         }
+    //     }
+
+    //     return redirect()->route('kunjungans.show', $kunjungan->id)
+    //                      ->with('success', 'Data kunjungan berhasil dibuat!');
+    // }
+
+    // GANTI METHOD store() MENJADI INI:
     public function store(Request $request)
     {
         $request->validate([
@@ -164,17 +223,34 @@ class KunjunganController extends Controller
         ]);
 
         // ==============================================================
-        // CEK KUOTA HARIAN (LIMIT 200 PER UPT PER HARI)
+        // CEK KUOTA (DINAMIS PER UPT & SESI)
         // ==============================================================
-        $kuotaMaksimal = 200;
-        $jumlahAntrean = Kunjungan::where('upt_id', $request->upt_id)
-            ->where('tanggal_kunjungan', $request->tanggal_kunjungan)
-            ->whereNotIn('status', ['Batal', 'Kadaluarsa']) // Abaikan yang batal/kadaluarsa
-            ->count();
+        $uptId = $request->upt_id;
+        
+        if ($uptId == 3) {
+            // LAPAS PEREMPUAN (LPP): Kuota 50 per Sesi
+            $kuotaMaksimal = 50;
+            $jumlahAntrean = Kunjungan::where('upt_id', $uptId)
+                ->where('tanggal_kunjungan', $request->tanggal_kunjungan)
+                ->where('waktu_kunjungan', $request->waktu_kunjungan) // Dihitung per Sesi
+                ->whereNotIn('status', ['Batal', 'Kadaluarsa'])
+                ->count();
+                
+            $pesanError = "Mohon maaf, kuota kunjungan untuk " . $request->waktu_kunjungan . " sudah penuh (Maks: $kuotaMaksimal antrean). Silakan pilih Sesi atau Tanggal lain.";
+        } else {
+            // LAPAS LOBAR / LAINNYA: Kuota 200 per Hari (Bebas sesi)
+            $kuotaMaksimal = 200;
+            $jumlahAntrean = Kunjungan::where('upt_id', $uptId)
+                ->where('tanggal_kunjungan', $request->tanggal_kunjungan)
+                ->whereNotIn('status', ['Batal', 'Kadaluarsa'])
+                ->count();
+                
+            $pesanError = "Mohon maaf, kuota harian kunjungan untuk tanggal tersebut sudah penuh (Maks: $kuotaMaksimal antrean/hari). Silakan pilih tanggal lain.";
+        }
 
         if ($jumlahAntrean >= $kuotaMaksimal) {
             throw ValidationException::withMessages([
-                'tanggal_kunjungan' => "Mohon maaf, kuota kunjungan untuk tanggal tersebut sudah penuh (Maks: $kuotaMaksimal antrean). Silakan pilih tanggal lain."
+                'tanggal_kunjungan' => $pesanError
             ]);
         }
         // ==============================================================
@@ -212,6 +288,88 @@ class KunjunganController extends Controller
                          ->with('success', 'Data kunjungan berhasil dibuat!');
     }
 
+    // GANTI METHOD update() MENJADI INI:
+    public function update(Request $request, Kunjungan $kunjungan)
+    {
+        $user = auth()->user();
+        if ($user->hasRole('Pengunjung')) {
+            abort(403, 'Akses ditolak.');
+        }
+
+        $request->validate([
+            'upt_id' => 'required|exists:upts,id',
+            'wbp_id' => 'required|exists:wbps,id',
+            'tanggal_kunjungan' => 'required|date',
+            'waktu_kunjungan' => 'required',
+        ]);
+
+        // ==============================================================
+        // CEK KUOTA HARIAN (Khusus jika mengganti Tanggal, UPT, atau Sesi)
+        // ==============================================================
+        if ($kunjungan->tanggal_kunjungan !== $request->tanggal_kunjungan || 
+            $kunjungan->upt_id !== $request->upt_id || 
+            $kunjungan->waktu_kunjungan !== $request->waktu_kunjungan) {
+            
+            $uptId = $request->upt_id;
+            
+            if ($uptId == 3) {
+                // LAPAS PEREMPUAN
+                $kuotaMaksimal = 50;
+                $jumlahAntrean = Kunjungan::where('upt_id', $uptId)
+                    ->where('tanggal_kunjungan', $request->tanggal_kunjungan)
+                    ->where('waktu_kunjungan', $request->waktu_kunjungan)
+                    ->where('id', '!=', $kunjungan->id) // Jangan hitung diri sendiri
+                    ->whereNotIn('status', ['Batal', 'Kadaluarsa'])
+                    ->count();
+                $pesanError = "Mohon maaf, kuota kunjungan untuk " . $request->waktu_kunjungan . " sudah penuh (Maks: $kuotaMaksimal antrean).";
+            } else {
+                // LAPAS LOBAR / LAINNYA
+                $kuotaMaksimal = 200;
+                $jumlahAntrean = Kunjungan::where('upt_id', $uptId)
+                    ->where('tanggal_kunjungan', $request->tanggal_kunjungan)
+                    ->where('id', '!=', $kunjungan->id) // Jangan hitung diri sendiri
+                    ->whereNotIn('status', ['Batal', 'Kadaluarsa'])
+                    ->count();
+                $pesanError = "Mohon maaf, kuota harian kunjungan untuk tanggal tersebut sudah penuh (Maks: $kuotaMaksimal antrean/hari).";
+            }
+
+            if ($jumlahAntrean >= $kuotaMaksimal) {
+                throw ValidationException::withMessages([
+                    'tanggal_kunjungan' => $pesanError
+                ]);
+            }
+        }
+        // ==============================================================
+
+        $kunjungan->update([
+            'upt_id' => $request->upt_id,
+            'wbp_id' => $request->wbp_id,
+            'tanggal_kunjungan' => $request->tanggal_kunjungan,
+            'waktu_kunjungan' => $request->waktu_kunjungan,
+            'pengikut_laki' => $request->pengikut_laki,
+            'pengikut_perempuan' => $request->pengikut_perempuan,
+            'pengikut_anak' => $request->pengikut_anak,
+            'total_pengikut' => $request->total_pengikut,
+            'status' => $request->status,
+        ]);
+
+        $kunjungan->barangBawaans()->delete();
+
+        if ($request->has('barang_bawaan') && is_array($request->barang_bawaan)) {
+            foreach ($request->barang_bawaan as $barang) {
+                if (!empty($barang['jenis_barang'])) {
+                    $kunjungan->barangBawaans()->create([
+                        'jenis_barang' => $barang['jenis_barang'],
+                        'jumlah' => $barang['jumlah'],
+                        'keterangan' => $barang['keterangan'] ?? '-',
+                    ]);
+                }
+            }
+        }
+
+        return redirect()->route('kunjungans.index')->with('success', 'Data kunjungan berhasil diperbarui!');
+    }
+    
     public function show(Kunjungan $kunjungan)
     {
         $kunjungan->load(['upt', 'wbp.sel.blok', 'barangBawaans', 'pengunjung.user']);
@@ -254,67 +412,67 @@ class KunjunganController extends Controller
         ]);
     }
 
-    public function update(Request $request, Kunjungan $kunjungan)
-    {
-        $user = auth()->user();
-        if ($user->hasRole('Pengunjung')) {
-            abort(403, 'Akses ditolak.');
-        }
+    // public function update(Request $request, Kunjungan $kunjungan)
+    // {
+    //     $user = auth()->user();
+    //     if ($user->hasRole('Pengunjung')) {
+    //         abort(403, 'Akses ditolak.');
+    //     }
 
-        $request->validate([
-            'upt_id' => 'required|exists:upts,id',
-            'wbp_id' => 'required|exists:wbps,id',
-            'tanggal_kunjungan' => 'required|date',
-            'waktu_kunjungan' => 'required',
-        ]);
+    //     $request->validate([
+    //         'upt_id' => 'required|exists:upts,id',
+    //         'wbp_id' => 'required|exists:wbps,id',
+    //         'tanggal_kunjungan' => 'required|date',
+    //         'waktu_kunjungan' => 'required',
+    //     ]);
 
-        // ==============================================================
-        // CEK KUOTA HARIAN (Khusus jika mengganti Tanggal atau UPT)
-        // ==============================================================
-        if ($kunjungan->tanggal_kunjungan !== $request->tanggal_kunjungan || $kunjungan->upt_id !== $request->upt_id) {
-            $kuotaMaksimal = 200;
-            $jumlahAntrean = Kunjungan::where('upt_id', $request->upt_id)
-                ->where('tanggal_kunjungan', $request->tanggal_kunjungan)
-                ->where('id', '!=', $kunjungan->id) // Jangan hitung diri sendiri
-                ->whereNotIn('status', ['Batal', 'Kadaluarsa'])
-                ->count();
+    //     // ==============================================================
+    //     // CEK KUOTA HARIAN (Khusus jika mengganti Tanggal atau UPT)
+    //     // ==============================================================
+    //     if ($kunjungan->tanggal_kunjungan !== $request->tanggal_kunjungan || $kunjungan->upt_id !== $request->upt_id) {
+    //         $kuotaMaksimal = 200;
+    //         $jumlahAntrean = Kunjungan::where('upt_id', $request->upt_id)
+    //             ->where('tanggal_kunjungan', $request->tanggal_kunjungan)
+    //             ->where('id', '!=', $kunjungan->id) // Jangan hitung diri sendiri
+    //             ->whereNotIn('status', ['Batal', 'Kadaluarsa'])
+    //             ->count();
 
-            if ($jumlahAntrean >= $kuotaMaksimal) {
-                throw ValidationException::withMessages([
-                    'tanggal_kunjungan' => "Mohon maaf, kuota kunjungan untuk tanggal tersebut sudah penuh (Maks: $kuotaMaksimal antrean). Silakan pilih tanggal lain."
-                ]);
-            }
-        }
-        // ==============================================================
+    //         if ($jumlahAntrean >= $kuotaMaksimal) {
+    //             throw ValidationException::withMessages([
+    //                 'tanggal_kunjungan' => "Mohon maaf, kuota kunjungan untuk tanggal tersebut sudah penuh (Maks: $kuotaMaksimal antrean). Silakan pilih tanggal lain."
+    //             ]);
+    //         }
+    //     }
+    //     // ==============================================================
 
-        $kunjungan->update([
-            'upt_id' => $request->upt_id,
-            'wbp_id' => $request->wbp_id,
-            'tanggal_kunjungan' => $request->tanggal_kunjungan,
-            'waktu_kunjungan' => $request->waktu_kunjungan,
-            'pengikut_laki' => $request->pengikut_laki,
-            'pengikut_perempuan' => $request->pengikut_perempuan,
-            'pengikut_anak' => $request->pengikut_anak,
-            'total_pengikut' => $request->total_pengikut,
-            'status' => $request->status,
-        ]);
+    //     $kunjungan->update([
+    //         'upt_id' => $request->upt_id,
+    //         'wbp_id' => $request->wbp_id,
+    //         'tanggal_kunjungan' => $request->tanggal_kunjungan,
+    //         'waktu_kunjungan' => $request->waktu_kunjungan,
+    //         'pengikut_laki' => $request->pengikut_laki,
+    //         'pengikut_perempuan' => $request->pengikut_perempuan,
+    //         'pengikut_anak' => $request->pengikut_anak,
+    //         'total_pengikut' => $request->total_pengikut,
+    //         'status' => $request->status,
+    //     ]);
 
-        $kunjungan->barangBawaans()->delete();
+    //     $kunjungan->barangBawaans()->delete();
 
-        if ($request->has('barang_bawaan') && is_array($request->barang_bawaan)) {
-            foreach ($request->barang_bawaan as $barang) {
-                if (!empty($barang['jenis_barang'])) {
-                    $kunjungan->barangBawaans()->create([
-                        'jenis_barang' => $barang['jenis_barang'],
-                        'jumlah' => $barang['jumlah'],
-                        'keterangan' => $barang['keterangan'] ?? '-',
-                    ]);
-                }
-            }
-        }
+    //     if ($request->has('barang_bawaan') && is_array($request->barang_bawaan)) {
+    //         foreach ($request->barang_bawaan as $barang) {
+    //             if (!empty($barang['jenis_barang'])) {
+    //                 $kunjungan->barangBawaans()->create([
+    //                     'jenis_barang' => $barang['jenis_barang'],
+    //                     'jumlah' => $barang['jumlah'],
+    //                     'keterangan' => $barang['keterangan'] ?? '-',
+    //                 ]);
+    //             }
+    //         }
+    //     }
 
-        return redirect()->route('kunjungans.index')->with('success', 'Data kunjungan berhasil diperbarui!');
-    }
+    //     return redirect()->route('kunjungans.index')->with('success', 'Data kunjungan berhasil diperbarui!');
+    // }
 
     public function destroy(Kunjungan $kunjungan)
     {
