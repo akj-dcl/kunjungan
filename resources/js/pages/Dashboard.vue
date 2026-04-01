@@ -7,6 +7,7 @@ import { debounce } from 'lodash';
 // Import Chart.js
 import { Line } from 'vue-chartjs';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
+import { Download, ShieldAlert, UserCheck } from 'lucide-vue-next';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
@@ -81,7 +82,7 @@ const chartOptions = {
                     <p class="text-muted-foreground mt-1">Pantau statistik kunjungan secara real-time.</p>
                 </div>
                 <button @click="exportExcel" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-md font-medium shadow-sm flex items-center gap-2 transition-colors">
-                    📥 Tarik Excel
+                    <Download class="size-4"/> Excel
                 </button>
             </div>
 
@@ -118,7 +119,7 @@ const chartOptions = {
                         <p class="text-sm font-medium text-blue-600 dark:text-blue-400">Total Orang Membesuk</p>
                         <h3 class="text-4xl font-black text-blue-800 dark:text-blue-300 mt-2">{{ ringkasan.total_orang }} <span class="text-lg font-medium text-blue-500">Orang</span></h3>
                     </div>
-                    <div class="text-blue-300 text-6xl opacity-50">👥</div>
+                    <div class="text-blue-300 text-6xl opacity-50"><UserCheck class="size-15"/></div>
                 </div>
                 
                 <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-6 shadow-sm flex items-center justify-between">
@@ -126,7 +127,7 @@ const chartOptions = {
                         <p class="text-sm font-medium text-red-600 dark:text-red-400">Total WBP Dibesuk</p>
                         <h3 class="text-4xl font-black text-red-800 dark:text-red-300 mt-2">{{ ringkasan.total_wbp }} <span class="text-lg font-medium text-red-500">WBP</span></h3>
                     </div>
-                    <div class="text-red-300 text-6xl opacity-50">🔒</div>
+                    <div class="text-red-300 text-6xl opacity-50"><ShieldAlert class="size-15"/></div>
                 </div>
             </div>
 

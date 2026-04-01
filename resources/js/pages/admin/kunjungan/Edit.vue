@@ -10,9 +10,8 @@ const props = defineProps<{
     upts: { id: number, name: string }[]
 }>();
 
-// Form Data dengan Pre-fill Data Kunjungan
 const form = useForm({
-    _method: 'PUT', // Untuk method spoofing Laravel
+    _method: 'PUT',
     upt_id: props.kunjungan.upt_id,
     wbp_id: props.kunjungan.wbp_id,
     tanggal_kunjungan: props.kunjungan.tanggal_kunjungan,
@@ -22,7 +21,6 @@ const form = useForm({
     pengikut_anak: props.kunjungan.pengikut_anak,
     total_pengikut: props.kunjungan.total_pengikut,
     status: props.kunjungan.status,
-    // Format barang bawaan yang lama agar sesuai form
     barang_bawaan: props.kunjungan.barang_bawaans.map((b: any) => ({
         jenis_barang: b.jenis_barang,
         jumlah: b.jumlah,
@@ -40,16 +38,20 @@ const totalPengikut = computed(() => {
 const tambahBarang = () => form.barang_bawaan.push({ jenis_barang: '', jumlah: 1, keterangan: '' });
 const hapusBarang = (index: number | string) => form.barang_bawaan.splice(Number(index), 1);
 
-// Logika Pencarian WBP
 const searchQuery = ref('');
 const searchResults = ref<any[]>([]);
 const isSearching = ref(false);
-const selectedWbpDetail = ref<any>(props.kunjungan.wbp); // Isi dengan data WBP asal
+const selectedWbpDetail = ref<any>(props.kunjungan.wbp); 
 
-// Set nilai awal pencarian dengan nama WBP saat ini
 onMounted(() => {
     if (props.kunjungan.wbp) {
         searchQuery.value = `${props.kunjungan.wbp.nama} (${props.kunjungan.wbp.no_reg_instansi})`;
+    }
+});
+
+watch(() => form.upt_id, (newVal) => {
+    if (newVal == '1' && form.waktu_kunjungan === 'Sesi 2 (13.00 - 15.00)') {
+        form.waktu_kunjungan = 'Sesi 1 (09.00 - 11.00)';
     }
 });
 
@@ -92,7 +94,15 @@ const submit = () => {
         alert('Harap pilih WBP tujuan dari daftar pencarian terlebih dahulu!');
         return;
     }
-    // Ganti path post ke rute update kunjungan id
+
+    if (form.upt_id == '1') {
+        const jumlahDewasa = Number(form.pengikut_laki) + Number(form.pengikut_perempuan);
+        if (jumlahDewasa > 3) {
+            alert('PERHATIAN! Untuk Lapas Lombok Barat, gabungan pengikut dewasa (Laki-laki + Perempuan) maksimal adalah 3 orang.');
+            return;
+        }
+    }
+
     form.post(`/admin/kunjungans/${props.kunjungan.id}`);
 };
 </script>
@@ -140,7 +150,7 @@ const submit = () => {
                             <select v-model="form.waktu_kunjungan" class="flex h-10 w-full rounded-md border px-3" required>
                                 <option value="" disabled>-- Pilih Sesi --</option>
                                 <option value="Sesi 1 (09.00 - 11.00)">Sesi 1 Pagi (09.00 - 11.00 WITA)</option>
-                                <option value="Sesi 2 (13.00 - 15.00)">Sesi 2 Siang (13.00 - 15.00 WITA)</option>
+                                <option v-if="form.upt_id != '1'" value="Sesi 2 (13.00 - 15.00)">Sesi 2 Siang (13.00 - 15.00 WITA)</option>
                             </select>
                         </div>
                     </div>
@@ -170,6 +180,9 @@ const submit = () => {
                     </div>
 
                     <h3 class="text-lg font-semibold border-b pb-2 mt-8">3. Jumlah Pengikut</h3>
+                    <div v-if="form.upt_id == '1'" class="mt-2 mb-4 text-xs font-bold text-red-600 bg-red-50 p-2 rounded-md border border-red-200 inline-block">
+                        * Khusus Lapas Lobar: Maksimal gabungan pengikut dewasa (Laki-laki + Perempuan) adalah 3 orang. Anak-anak bebas.
+                    </div>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div class="space-y-2"><label class="text-sm font-medium">Laki-laki</label><input v-model="form.pengikut_laki" type="number" min="0" class="flex h-10 w-full rounded-md border px-3" required></div>
                         <div class="space-y-2"><label class="text-sm font-medium">Perempuan</label><input v-model="form.pengikut_perempuan" type="number" min="0" class="flex h-10 w-full rounded-md border px-3" required></div>

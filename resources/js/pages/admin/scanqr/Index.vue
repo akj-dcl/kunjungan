@@ -4,6 +4,7 @@ import { Head, usePage } from '@inertiajs/vue3';
 import { ref, onMounted, watch } from 'vue';
 import axios from 'axios';
 import { QrcodeStream } from 'vue-qrcode-reader';
+import { Camera, Notebook, Printer, Search, Trash2 } from 'lucide-vue-next';
 
 const page = usePage<any>();
 const userUptId = page.props.auth?.user?.upt_id || 'pusat'; // Ambil ID UPT petugas yang login
@@ -106,7 +107,7 @@ const printKartu = (id: number) => {
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-2">
                 <div class="rounded-xl border border-border bg-card shadow-sm overflow-hidden flex flex-col">
                     <div class="p-4 border-b bg-gray-50 dark:bg-gray-800">
-                        <h3 class="font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2">📷 Kamera Scanner</h3>
+                        <h3 class="font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2"><Camera class="size-5"/> Kamera Scanner</h3>
                     </div>
                     <div class="p-6 flex-1 flex items-center justify-center bg-black relative min-h-[300px]">
                         <qrcode-stream v-if="isScanning" @detect="onDetect" class="w-full h-full"></qrcode-stream>
@@ -127,7 +128,7 @@ const printKartu = (id: number) => {
 
                 <div class="rounded-xl border border-border bg-card shadow-sm overflow-hidden flex flex-col">
                     <div class="p-4 border-b bg-gray-50 dark:bg-gray-800">
-                        <h3 class="font-semibold text-gray-800 dark:text-gray-200">📋 Detail Kunjungan Terbaru</h3>
+                        <h3 class="font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2"><Notebook class="size-5"/> Detail Kunjungan Terbaru</h3>
                     </div>
                     <div class="p-6 flex-1 bg-gray-50/50 dark:bg-gray-900/20">
                         <div v-if="activeDetail" class="space-y-4">
@@ -157,7 +158,7 @@ const printKartu = (id: number) => {
                             </div>
                         </div>
                         <div v-else class="h-full flex flex-col items-center justify-center text-gray-400">
-                            <span class="text-4xl mb-2">🔍</span>
+                            <span class="text-4xl mb-2"><Search class="size-5"/></span>
                             <p class="text-sm">Belum ada data. Arahkan QR Code ke kamera.</p>
                         </div>
                     </div>
@@ -167,8 +168,8 @@ const printKartu = (id: number) => {
             <div class="rounded-xl border border-border bg-card text-card-foreground shadow-sm overflow-hidden mt-4">
                 <div class="p-4 border-b bg-gray-50 dark:bg-gray-800 flex justify-between items-center">
                     <h3 class="font-semibold text-gray-800 dark:text-gray-200">Riwayat Scan Sesi Ini</h3>
-                    <button @click="bersihkanRiwayat" class="text-xs bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1.5 rounded-md font-semibold transition-colors">
-                        🗑️ Bersihkan Riwayat
+                    <button @click="bersihkanRiwayat" class="text-xs text-left bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1.5 rounded-md font-semibold transition-colors flex items-center gap-2">
+                        <Trash2 class="size-5"/> Bersihkan Riwayat
                     </button>
                 </div>
                 <div class="relative w-full overflow-auto">
@@ -179,7 +180,7 @@ const printKartu = (id: number) => {
                                 <th class="h-10 px-4 text-left font-medium text-muted-foreground">Pengunjung</th>
                                 <th class="h-10 px-4 text-left font-medium text-muted-foreground">WBP Tujuan</th>
                                 <th class="h-10 px-4 text-left font-medium text-muted-foreground">Lokasi WBP</th>
-                                <th class="h-10 px-4 text-right font-medium text-muted-foreground">Aksi</th>
+                                <th class="h-10 px-4 text-left font-medium text-muted-foreground">Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -191,9 +192,9 @@ const printKartu = (id: number) => {
                                 <td class="p-3 text-right">
                                     <button 
                                         @click="printKartu(item.id)" 
-                                        class="bg-blue-100 text-blue-700 px-3 py-1 rounded text-xs font-bold hover:bg-blue-200"
+                                        class="bg-blue-100 text-blue-700 px-3 py-1 rounded text-xs font-bold hover:bg-blue-200 flex items-center gap-2" 
                                     >
-                                        🖨️ Cetak Kartu
+                                        <Printer class="size-5"/> Cetak Kartu
                                     </button>
                                 </td>
                             </tr>

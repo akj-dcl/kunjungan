@@ -5,12 +5,10 @@ import { ref, computed, watch } from 'vue';
 import axios from 'axios';
 import { debounce } from 'lodash';
 
-// Data Props dari Controller
 const props = defineProps<{
     upts: { id: number, name: string }[]
 }>();
 
-// Form Data Utama (Beri default 0 bukan string kosong untuk angka)
 const form = useForm({
     upt_id: props.upts?.[0]?.id ? String(props.upts[0].id) : '',
     wbp_id: '',
@@ -19,22 +17,20 @@ const form = useForm({
     pengikut_laki: 0,
     pengikut_perempuan: 0,
     pengikut_anak: 0,
-    total_pengikut: 1, // Default 1 (dirinya sendiri)
+    total_pengikut: 1,
     barang_bawaan: [] as Array<{ jenis_barang: string, jumlah: number, keterangan: string }>
 });
 
-// Otomatis Hitung Total Pengikut (+1 karena Pendaftar dihitung)
 const totalPengikut = computed(() => {
-    // Hitung pengikut yang dibawa
+    
     const jumlahBawaan = Number(form.pengikut_laki) + Number(form.pengikut_perempuan) + Number(form.pengikut_anak);
-    // Tambah 1 (si pengunjung yang daftar form)
+
     const total = jumlahBawaan + 1; 
     
-    form.total_pengikut = total; // update form
+    form.total_pengikut = total;
     return total;
 });
 
-// Fungsi Dinamis Barang Bawaan
 const tambahBarang = () => {
     form.barang_bawaan.push({ jenis_barang: '', jumlah: 1, keterangan: '' });
 };
@@ -42,15 +38,17 @@ const hapusBarang = (index: number) => {
     form.barang_bawaan.splice(index, 1);
 };
 
-// ==========================================
-// LOGIKA PENCARIAN WBP (DIPERBARUI)
-// ==========================================
 const searchQuery = ref('');
 const searchResults = ref<any[]>([]);
 const isSearching = ref(false);
 const selectedWbpDetail = ref<any>(null);
 
-// Gunakan Watch + Debounce (Lebih stabil dari @input)
+watch(() => form.upt_id, (newVal) => {
+    if (newVal == '1' && form.waktu_kunjungan === 'Sesi 2 (13.00 - 15.00)') {
+        form.waktu_kunjungan = 'Sesi 1 (09.00 - 11.00)';
+    }
+});
+
 watch(
     searchQuery,
     debounce(async (newQuery: string) => {
@@ -88,10 +86,17 @@ const pilihWbp = (wbp: any) => {
 };
 
 const submit = () => {
-    // Validasi wbp_id di frontend sebelum post
     if (!form.wbp_id) {
         alert('Harap pilih WBP tujuan dari daftar pencarian terlebih dahulu!');
         return;
+    }
+
+    if (form.upt_id == '1') {
+        const jumlahDewasa = Number(form.pengikut_laki) + Number(form.pengikut_perempuan);
+        if (jumlahDewasa > 3) {
+            alert('PERHATIAN! Untuk Lapas Lombok Barat, gabungan pengikut dewasa (Laki-laki + Perempuan) maksimal adalah 3 orang.');
+            return;
+        }
     }
     form.post('/admin/kunjungans');
 };
@@ -128,10 +133,10 @@ const submit = () => {
                         </div>
                         <div class="space-y-2">
                             <label class="text-sm font-medium text-red-600">Pilih Sesi Kunjungan *</label>
-                            <select v-model="form.waktu_kunjungan" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500" required>
+                            <select v-model="form.waktu_kunjungan" class="flex h-10 w-full rounded-md border px-3" required>
                                 <option value="" disabled>-- Pilih Sesi --</option>
                                 <option value="Sesi 1 (09.00 - 11.00)">Sesi 1 Pagi (09.00 - 11.00 WITA)</option>
-                                <option value="Sesi 2 (13.00 - 15.00)">Sesi 2 Siang (13.00 - 15.00 WITA)</option>
+                                <option v-if="form.upt_id != '1'" value="Sesi 2 (13.00 - 15.00)">Sesi 2 Siang (13.00 - 15.00 WITA)</option>
                             </select>
                         </div>
                     </div>
@@ -181,6 +186,9 @@ const submit = () => {
                     </div>
 
                     <h3 class="text-lg font-semibold border-b pb-2 mt-8">3. Jumlah Pengikut (Yang Dibawa)</h3>
+                    <div v-if="form.upt_id == '1'" class="mt-2 mb-4 text-xs font-bold text-red-600 bg-red-50 p-2 rounded-md border border-red-200 inline-block">
+                        * Khusus Lapas Lobar: Maksimal gabungan pengikut dewasa (Laki-laki + Perempuan) adalah 3 orang. Anak-anak bebas.
+                    </div>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div class="space-y-2">
                             <label class="text-sm font-medium">Laki-laki</label>

@@ -19,16 +19,12 @@ const props = defineProps<{
 
 const page = usePage()
 
-// State untuk filter
 const filterForm = ref({
   search: props.filters.search ?? '',
   tanggal: props.filters.tanggal ?? '',
   waktu: props.filters.waktu ?? '',
 })
 
-// ==========================================
-// STATE UNTUK POPUP FOTO (MODAL)
-// ==========================================
 const isModalOpen = ref(false);
 const selectedImage = ref('');
 
